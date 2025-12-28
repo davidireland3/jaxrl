@@ -7,6 +7,7 @@ from typing import Dict
 class BaseAgent(nnx.Module, ABC):
     """Abstract base class for RL agents."""
     step = 0  # Number of updates we've done
+    gamma = 0.99
 
     @abstractmethod
     def select_action(self, state: jnp.ndarray, **kwargs) -> int:

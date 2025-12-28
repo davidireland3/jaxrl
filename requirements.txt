@@ -4,3 +4,4 @@ flax
 torch
 torchvision
 numpy
+gymnasium

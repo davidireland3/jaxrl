@@ -1,6 +1,5 @@
-from jaxrl.algorithms.dqn import DQN
-from jaxrl.algorithms.ddqn import DDQN
-from jaxrl.configs.dqn import DQNConfig
+from jaxrl.algorithms import *
+from jaxrl.configs import *
 
 
 AGENT_REGISTRY = {
@@ -11,6 +10,10 @@ AGENT_REGISTRY = {
     'ddqn': {
         'class': DDQN,
         'config': DQNConfig,
+    },
+    'ppo': {
+        'class': PPO,
+        'config': PPOConfig,
     }
 }
 

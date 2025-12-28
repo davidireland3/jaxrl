@@ -1,0 +1,6 @@
+jax
+loguru
+flax
+torch
+torchvision
+numpy

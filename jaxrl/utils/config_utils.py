@@ -3,11 +3,10 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Optional, Union
 
-from jaxrl.configs.base import BaseConfig
-from jaxrl.configs.dqn import DQNConfig
+from jaxrl.configs import *
 
 
-def load_config(config_class, config_path: Optional[str] = None) -> Union[BaseConfig, DQNConfig]:
+def load_config(config_class, config_path: Optional[str] = None) -> Union[PPOConfig, DQNConfig]:
     """
     Load config with defaults, optionally overriding with YAML.
 

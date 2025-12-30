@@ -11,7 +11,7 @@ class BaseConfig:
     hidden_dim: int = 512
 
     # Training params
-    total_timesteps: int = 50_000
+    total_timesteps: int = 500_000
     train_freq: int = 1
     eval_freq: int = 2_500
     eval_episodes: int = 10

@@ -15,6 +15,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo", type=str, required=True, help="Algorithm name (dqn, ppo, sac)")
     parser.add_argument("--config", type=str, default=None, help="Path to config YAML (optional)")
+    parser.add_argument("--env", type=str, default=None, help="Environment name")
     args = parser.parse_args()
 
     # Get agent class and config
@@ -27,6 +28,8 @@ def main():
     logger.info(f"Config: {config}")
 
     # Create environment
+    if args.env is not None:
+        config.env_name = args.env
     env = gym.make(config.env_name)
     eval_env = gym.make(config.env_name)
 

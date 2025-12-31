@@ -1,4 +1,6 @@
 import gymnasium as gym
+import wandb
+from collections import deque
 from loguru import logger
 from typing import Optional, Dict, Any
 from tqdm import tqdm
@@ -20,6 +22,7 @@ def train(
         log_freq: int = 1000,
         seed: int = 0,
         batch_size: int = 256,
+        use_wandb: bool = False,
 ) -> Dict[str, Any]:
     """
     Generic training loop for RL agents.
@@ -37,6 +40,7 @@ def train(
         log_freq: Print metrics every N steps
         seed: Random seed
         batch_size: Batch size
+        use_wandb: Use wandb
 
     Returns:
         metrics: Dictionary of training metrics
@@ -44,7 +48,9 @@ def train(
     state, _ = env.reset(seed=seed)
     episode_reward = 0
     episode_count = 0
+    episode_length = 0
     all_episode_rewards = []
+    rolling_rewards = deque(maxlen=100)
 
     for step in tqdm(range(total_timesteps)):
         # Select action
@@ -58,23 +64,41 @@ def train(
         buffer.add(state, action, reward, next_state, terminated)
 
         episode_reward += reward
+        episode_length += 1
         state = next_state
 
         if done:
             state, _ = env.reset()
             all_episode_rewards.append(episode_reward)
+            rolling_rewards.append(episode_reward)
             episode_count += 1
+
+            # Log to wandb
+            if use_wandb:
+                wandb.log({
+                    "env_step": step,
+                    "train/episode_reward": episode_reward,
+                    "train/episode_length": episode_length,
+                    "train/rolling_avg_reward": sum(rolling_rewards) / len(rolling_rewards),
+                })
 
             if episode_count % 10 == 0:
                 logger.info(f"Episode {episode_count}, Reward: {episode_reward:.2f}")
 
             episode_reward = 0
+            episode_length = 0
 
         # Training
         if step >= learning_starts and step % train_freq == 0:
             batch = buffer.sample(batch_size=batch_size)
             metrics = agent.update(batch)
             agent.step += 1
+
+            # Log losses to wandb
+            if use_wandb:
+                log_dict = {f"loss/{k}": v for k, v in metrics.items()}
+                log_dict["agent_step"] = agent.step
+                wandb.log(log_dict)
 
             if step % log_freq == 0:
                 logger.info(f"Step {step}, Metrics: {metrics}")
@@ -84,6 +108,10 @@ def train(
             eval_env = eval_env or env
             eval_reward = evaluate(agent, eval_env, n_episodes=eval_episodes, seed=seed)
             logger.info(f"[Eval] Step {step}, Mean Reward: {eval_reward:.2f}")
+
+            # Log eval reward to wandb
+            if use_wandb:
+                wandb.log({"env_step": step, "eval/mean_reward": eval_reward})
 
     return {
         "episode_rewards": all_episode_rewards,

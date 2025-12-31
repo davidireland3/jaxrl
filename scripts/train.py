@@ -1,5 +1,6 @@
 import argparse
 import gymnasium as gym
+import wandb
 from loguru import logger
 from flax import nnx
 
@@ -16,6 +17,8 @@ def main():
     parser.add_argument("--algo", type=str, required=True, help="Algorithm name (dqn, ppo, sac)")
     parser.add_argument("--config", type=str, default=None, help="Path to config YAML (optional)")
     parser.add_argument("--env", type=str, default=None, help="Environment name")
+    parser.add_argument("--use-wandb", action="store_true", help="Enable Weights & Biases logging")
+    parser.add_argument("--wandb-project", type=str, default="jaxrl", help="W&B project name")
     args = parser.parse_args()
 
     # Get agent class and config
@@ -35,6 +38,20 @@ def main():
 
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
+
+    # Initialise wandb if enabled
+    if args.use_wandb:
+        wandb.init(
+            project=args.wandb_project,
+            name=f"{args.algo}_{config.env_name}",
+            config=vars(config),
+        )
+        # Define custom x-axes for different metric types
+        wandb.define_metric("agent_step")
+        wandb.define_metric("loss/*", step_metric="agent_step")
+        wandb.define_metric("train/*", step_metric="env_step")
+        wandb.define_metric("eval/*", step_metric="env_step")
+        logger.info("Weights & Biases logging enabled")
 
     logger.info("Starting training...")
 
@@ -70,6 +87,7 @@ def main():
             eval_episodes=config.eval_episodes,
             log_freq=config.log_freq,
             seed=config.seed,
+            use_wandb=args.use_wandb,
         )
     elif AgentClass == PPO:
         agent = AgentClass(
@@ -104,6 +122,7 @@ def main():
             eval_episodes=config.eval_episodes,
             log_freq=config.log_freq,
             seed=config.seed,
+            use_wandb=args.use_wandb,
         )
 
     logger.info("Training complete!")

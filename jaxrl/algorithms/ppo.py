@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import optax
 from flax import nnx
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Any
 
 from jaxrl.common.base_agent import BaseAgent
 from jaxrl.networks import MLP, PolicyNetwork
@@ -160,3 +160,28 @@ class PPO(BaseAgent):
                 num_updates += 1
 
         return {k: v / num_updates for k, v in total_losses.items()}
+
+    def _get_state(self, inference_only: bool = False) -> Dict[str, Any]:
+        """Get PPO state for checkpointing."""
+        if inference_only:
+            return {
+                'policy_network': nnx.state(self.policy_network),
+                'value_network': nnx.state(self.value_network),
+            }
+        else:
+            return {
+                'policy_network': nnx.state(self.policy_network),
+                'value_network': nnx.state(self.value_network),
+                'policy_optimiser': nnx.state(self.policy_optimiser),
+                'value_optimiser': nnx.state(self.value_optimiser),
+                'rngs': nnx.state(self.rngs),
+            }
+
+    def _restore_state(self, state: Dict[str, Any], inference_mode: bool = False) -> None:
+        """Restore PPO state from checkpoint."""
+        nnx.update(self.policy_network, state['policy_network'])
+        nnx.update(self.value_network, state['value_network'])
+        if not inference_mode:
+            nnx.update(self.policy_optimiser, state['policy_optimiser'])
+            nnx.update(self.value_optimiser, state['value_optimiser'])
+            nnx.update(self.rngs, state['rngs'])

@@ -88,6 +88,8 @@ def main():
             log_freq=config.log_freq,
             seed=config.seed,
             use_wandb=args.use_wandb,
+            config=config,
+            algo_name=args.algo,
         )
     elif AgentClass == PPO:
         agent = AgentClass(
@@ -123,6 +125,8 @@ def main():
             log_freq=config.log_freq,
             seed=config.seed,
             use_wandb=args.use_wandb,
+            config=config,
+            algo_name=args.algo,
         )
 
     logger.info("Training complete!")

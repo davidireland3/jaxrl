@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 from flax import nnx
-from typing import Dict
+from typing import Dict, Any
 
 from jaxrl.common.base_agent import BaseAgent
 from jaxrl.utils.schedules import LinearSchedule
@@ -87,3 +87,21 @@ class DQN(BaseAgent):
 
         # Update the target network with the new state
         nnx.update(target_model, new_target_state)
+
+    def _get_state(self, inference_only: bool = False) -> Dict[str, Any]:
+        """Get DQN state for checkpointing."""
+        if inference_only:
+            return {'qnet': nnx.state(self.qnet)}
+        else:
+            return {
+                'qnet': nnx.state(self.qnet),
+                'target_qnet': nnx.state(self.target_qnet),
+                'optimiser': nnx.state(self.optimiser),
+            }
+
+    def _restore_state(self, state: Dict[str, Any], inference_mode: bool = False) -> None:
+        """Restore DQN state from checkpoint."""
+        nnx.update(self.qnet, state['qnet'])
+        if not inference_mode:
+            nnx.update(self.target_qnet, state['target_qnet'])
+            nnx.update(self.optimiser, state['optimiser'])

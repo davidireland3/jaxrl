@@ -4,6 +4,7 @@ from collections import deque
 from loguru import logger
 from typing import Optional, Dict, Any
 from tqdm import tqdm
+from pathlib import Path
 
 from jaxrl.common.base_agent import BaseAgent
 from jaxrl.buffers import RolloutBuffer
@@ -21,6 +22,8 @@ def train(
         log_freq: int = 1000,
         seed: int = 0,
         use_wandb: bool = False,
+        config: Optional[Any] = None,
+        algo_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Generic training loop for RL agents.
@@ -47,6 +50,7 @@ def train(
     episode_length = 0
     all_episode_rewards = []
     rolling_rewards = deque(maxlen=100)
+    best_eval_reward = float('-inf')
 
     for step in tqdm(range(total_timesteps)):
         # Select action
@@ -115,6 +119,23 @@ def train(
             # Log eval reward to wandb
             if use_wandb:
                 wandb.log({"env_step": step, "eval/mean_reward": eval_reward})
+
+            # Save checkpoints
+            if config is not None and algo_name is not None:
+                checkpoint_dir = Path("results") / config.env_name / algo_name / str(config.seed)
+                checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+                config_dict = vars(config) if hasattr(config, '__dict__') else config
+
+                # Save latest
+                agent.save_checkpoint(checkpoint_dir / "latest.pkl", config=config_dict)
+                logger.info(f"Saved latest checkpoint to {checkpoint_dir / 'latest.pkl'}")
+
+                # Save best
+                if eval_reward > best_eval_reward:
+                    best_eval_reward = eval_reward
+                    agent.save_checkpoint(checkpoint_dir / "best.pkl", config=config_dict)
+                    logger.info(f"Saved best checkpoint (reward={eval_reward:.2f}) to {checkpoint_dir / 'best.pkl'}")
 
     return {
         "episode_rewards": all_episode_rewards,

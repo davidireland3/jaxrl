@@ -3,6 +3,10 @@ from jaxrl.configs import *
 
 
 AGENT_REGISTRY = {
+    'ddpg': {
+        'class': DDPG,
+        'config': DDPGConfig,
+    },
     'dqn': {
         'class': DQN,
         'config': DQNConfig,

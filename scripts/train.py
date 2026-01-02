@@ -2,14 +2,11 @@ import argparse
 import gymnasium as gym
 import wandb
 from loguru import logger
-from flax import nnx
 
-from jaxrl.algorithms import *
-from jaxrl.buffers import RolloutBuffer
-from jaxrl.buffers.replay_buffer import ReplayBuffer
-from jaxrl.common import off_policy_train, on_policy_train
 from jaxrl.utils.agent_registry import get_agent_info
 from jaxrl.utils.config_utils import load_config
+from jaxrl.utils.env_utils import get_action_space_info
+from jaxrl.utils.training_utils import create_agent_from_config, create_buffer, get_training_function
 
 
 def main():
@@ -37,7 +34,7 @@ def main():
     eval_env = gym.make(config.env_name)
 
     state_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.n
+    action_dim, discrete_actions = get_action_space_info(env.action_space)
 
     # Initialise wandb if enabled
     if args.use_wandb:
@@ -55,79 +52,28 @@ def main():
 
     logger.info("Starting training...")
 
+    # Create agent and buffer
+    agent = create_agent_from_config(AgentClass, config, state_dim, action_dim)
+    buffer = create_buffer(AgentClass, config, state_dim, action_dim, discrete_actions)
+    train_fn = get_training_function(AgentClass)
+
     # Train
-    if AgentClass in [DQN, DDQN]:
-        # Create agent
-        agent = AgentClass(
-            state_dim=state_dim,
-            action_dim=action_dim,
-            hidden_dim=config.hidden_dim,
-            learning_rate=config.learning_rate,
-            gamma=config.gamma,
-            tau=config.tau,
-            epsilon_min=config.epsilon_min,
-            epsilon_duration=config.epsilon_duration,
-            rngs=nnx.Rngs(config.seed),
-        )
-        # Create buffer
-        buffer = ReplayBuffer(
-            state_dim=state_dim,
-            capacity=config.buffer_size,
-            discrete_actions=True,
-        )
-        metrics = off_policy_train(
-            agent=agent,
-            env=env,
-            buffer=buffer,
-            total_timesteps=config.total_timesteps,
-            learning_starts=config.learning_starts,
-            train_freq=config.train_freq,
-            eval_freq=config.eval_freq,
-            eval_env=eval_env,
-            eval_episodes=config.eval_episodes,
-            log_freq=config.log_freq,
-            seed=config.seed,
-            use_wandb=args.use_wandb,
-            config=config,
-            algo_name=args.algo,
-        )
-    elif AgentClass == PPO:
-        agent = AgentClass(
-            state_dim=state_dim,
-            action_dim=action_dim,
-            hidden_dim=config.hidden_dim,
-            policy_learning_rate=config.policy_learning_rate,
-            value_learning_rate=config.value_learning_rate,
-            gamma=config.gamma,
-            clip_epsilon=config.clip_epsilon,
-            entropy_coef=config.entropy_coef,
-            max_grad_norm=config.max_grad_norm,
-            batch_size=config.batch_size,
-            n_epochs=config.n_epochs,
-            rngs=nnx.Rngs(config.seed),
-        )
-        buffer = RolloutBuffer(
-            state_dim=state_dim,
-            capacity=config.train_freq,
-            discrete_actions=True,
-            gamma=config.gamma,
-            gae_lambda=config.gae_lambda
-        )
-        metrics = on_policy_train(
-            agent=agent,
-            env=env,
-            buffer=buffer,
-            total_timesteps=config.total_timesteps,
-            train_freq=config.train_freq,
-            eval_freq=config.eval_freq,
-            eval_env=eval_env,
-            eval_episodes=config.eval_episodes,
-            log_freq=config.log_freq,
-            seed=config.seed,
-            use_wandb=args.use_wandb,
-            config=config,
-            algo_name=args.algo,
-        )
+    metrics = train_fn(
+        agent=agent,
+        env=env,
+        buffer=buffer,
+        total_timesteps=config.total_timesteps,
+        learning_starts=config.learning_starts,
+        train_freq=config.train_freq,
+        eval_freq=config.eval_freq,
+        eval_env=eval_env,
+        eval_episodes=config.eval_episodes,
+        log_freq=config.log_freq,
+        seed=config.seed,
+        use_wandb=args.use_wandb,
+        config=config,
+        algo_name=args.algo,
+    )
 
     logger.info("Training complete!")
     env.close()

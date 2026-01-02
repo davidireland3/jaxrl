@@ -5,8 +5,9 @@ from flax import nnx
 from loguru import logger
 from pathlib import Path
 
-from jaxrl.algorithms import DQN, DDQN, PPO
+from jaxrl.algorithms import DDPG, DQN, DDQN, PPO
 from jaxrl.utils.agent_registry import get_agent_info
+from jaxrl.utils.env_utils import get_action_space_info
 
 
 def test_agent(
@@ -39,10 +40,13 @@ def test_agent(
         done = False
 
         while not done:
-            # Select action (greedy for DQN/DDQN, normal for PPO)
+            # Select action (greedy for DQN/DDQN, deterministic for DDPG, normal for PPO)
             if algo_class in [DQN, DDQN]:
                 # Use greedy action selection for DQN/DDQN
                 action = agent._network_action_selection(agent.qnet, state).item()
+            elif algo_class == DDPG:
+                # Use deterministic action selection for DDPG
+                action = agent.select_action(state, deterministic=True)
             elif algo_class == PPO:
                 # PPO returns (action, log_prob, value)
                 action, _, _ = agent.select_action(state)
@@ -116,9 +120,9 @@ def main():
     env = gym.make(args.env, render_mode=render_mode)
 
     state_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.n
+    action_dim, discrete_actions = get_action_space_info(env.action_space)
 
-    logger.info(f"State dim: {state_dim}, Action dim: {action_dim}")
+    logger.info(f"State dim: {state_dim}, Action dim: {action_dim}, Discrete: {discrete_actions}")
 
     # Create agent with saved config
     if AgentClass in [DQN, DDQN]:
@@ -131,6 +135,20 @@ def main():
             tau=config_dict['tau'],
             epsilon_min=config_dict['epsilon_min'],
             epsilon_duration=config_dict['epsilon_duration'],
+            rngs=nnx.Rngs(args.seed),
+        )
+    elif AgentClass == DDPG:
+        agent = AgentClass(
+            state_dim=state_dim,
+            action_dim=action_dim,
+            hidden_dim=config_dict['hidden_dim'],
+            actor_learning_rate=config_dict['actor_learning_rate'],
+            critic_learning_rate=config_dict['critic_learning_rate'],
+            gamma=config_dict['gamma'],
+            tau=config_dict['tau'],
+            noise_std=config_dict['noise_std'],
+            noise_decay=config_dict['noise_decay'],
+            noise_min=config_dict['noise_min'],
             rngs=nnx.Rngs(args.seed),
         )
     elif AgentClass == PPO:
